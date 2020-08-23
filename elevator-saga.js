@@ -9,33 +9,18 @@ module.exports = {
           // For now, use the first floor in the array
           // TODO: Map through pressed floors to find farthest (or nearest?) floor requesting
           const currentFloor = elevator.currentFloor();
-          const farthestFloor = elevator.getPressedFloors()[0];
+          const destinationFloor = elevator.getPressedFloors()[0];
+          console.log(
+            `current floor: ${currentFloor}, dest floor: ${destinationFloor}`
+          );
+          currentFloor < destinationFloor
+            ? elevator.goingUpIndicator(true)
+            : elevator.goingUpIndicator(false);
+          elevator.goingUpIndicator(!elevator.goingDownIndicator());
 
-          elevator.goingUpIndicator(currentFloor < farthestFloor);
-          if (elevator.goingUpIndicator()) {
-            elevator.goingDownIndicator(false);
-          } else {
-            elevator.goingDownIndicator(true);
-          }
           // Go to the farthest floor requesting
           // TODO: Check every floor for requests going in that direction
-          elevator.goToFloor(farthestFloor);
-          elevator.on("passing_floor", (floorNum, direction) => {
-            floors[floorNum].on("up_button_pressed", () => {
-              // TODO: Use destinationDirection instead
-              if (direction === "up") {
-                console.log("going up, pick them up!");
-                console.log(elevator.destinationQueue);
-              }
-            });
-            floors[floorNum].on("down_button_pressed", () => {
-              if (direction === "down") {
-                console.log("going down, pick them up!");
-                console.log(elevator.destinationQueue);
-              }
-            });
-            console.log(`passing ${floorNum} going ${direction}`);
-          });
+          elevator.goToFloor(destinationFloor);
         }
 
         // When we stop at 0 or top floor, change direction indicator
@@ -51,9 +36,11 @@ module.exports = {
         // Otherwise, check to see if any floor is calling and go there
         floors.map((floor) => {
           floor.on("down_button_pressed", () => {
+            console.log(`down button pressed on floor ${floor.floorNum()}`);
             elevator.goToFloor(floor.floorNum());
           });
           floor.on("up_button_pressed", () => {
+            console.log(`up button pressed on floor ${floor.floorNum()}`);
             elevator.goToFloor(floor.floorNum());
           });
         });
