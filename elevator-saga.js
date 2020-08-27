@@ -1,63 +1,68 @@
 {
   init: (elevators, floors) => {
+      // Keep an array of floor requests
+      const floorRequests = [];
+
       // Map through elevators, since there will be more in the future
       elevators.map((elevator) => {
-          // Start by indicating up, since we're on the 0th floor
-          elevator.goingUpIndicator(true);
-          elevator.goingDownIndicator(false);
-
           elevator.on("idle", () => {
+              console.log("elevator idle");
               // Check to see if anyone inside wants to go somewhere
               if (elevator.getPressedFloors().length > 0) {
-                  // Calculate the direction indicator
-                  const currentFloor = elevator.currentFloor();
-                  const destinationFloor = elevator.getPressedFloors()[0];
-                  currentFloor < destinationFloor
-                      ? elevator.goingUpIndicator(true)
-                  : elevator.goingUpIndicator(false);
-                  elevator.goingDownIndicator(!elevator.goingUpIndicator());
-                  elevator.goToFloor(destinationFloor);
-                  // TODO: If there are no more requests in that direction, flip direction indicator
+                  elevator.getPressedFloors().forEach((floorNum) => {
+                      elevator.goToFloor(floorNum);
+                  });
               } else {
                   // No requests inside the elevator, so let's check for floor requests
-                  // TODO: Update direction indicator
-                  floors.map((floor) => {
-                      floor.on("down_button_pressed", () => {
-                          elevator.goToFloor(floor.floorNum());
+                  // If there are any, go there and remove from the floor requests
+                  if (floorRequests.length > 0) {
+                      floorRequests.forEach((request, index) => {
+                          elevator.goToFloor(request.floorNum);
+                          floorRequests.splice(index, 1);
                       });
-                      floor.on("up_button_pressed", () => {
-                          elevator.goToFloor(floor.floorNum());
-                      });
-                  });
-              }
-          });
-
-          // Any time we stop at 0 or the top floor, change direction indicator
-          elevator.on("stopped_at_floor", (floorNum) => {
-              if (floorNum === 0 || floorNum === floors.length - 1) {
-                  if (floorNum === 0) {
-                      elevator.goingUpIndicator(true);
-                      elevator.goingDownIndicator(false);
-                  } else {
-                      elevator.goingDownIndicator(true);
-                      elevator.goingUpIndicator(false);
                   }
               }
           });
 
-          // TODO: Check every floor for requests going in the direction of the elvator as it passes
+          // Check every floor for requests going in the direction of the elvator as it passes
           elevator.on("passing_floor", (floorNum, direction) => {
-              console.log(`elevator passing floor ${floorNum} going ${direction}`);
-              console.log(
-                  `destination direction is ${elevator.destinationDirection()}`
-              );
-              if (direction === elevator.destinationDirection()) {
-                  elevator.destinationQueue.unshift(floorNum);
-                  elevator.checkDestinationQueue();
-              } else {
-                  elevator.destinationQueue.pop(floorNum);
-                  elevator.checkDestinationQueue();
+              console.log(`passing ${floorNum} going ${direction}`);
+              // Check if floorNum is in floorRequests
+              if (floorRequests.length > 0 && elevator.loadFactor < 1) {
+                  floorRequests.forEach((request, index) => {
+                      if (
+                          request.floorNum === floorNum &&
+                          request.direction === direction
+                      ) {
+                          // If it is, go there and remove it from the floor requests
+                          elevator.goToFloor(floorNum);
+                          floorRequests.splice(index, 1);
+                      }
+                  });
               }
+          });
+
+          // Remove floor from the floor requests when the elevator is stopped at that floor
+          elevator.on("stopped_at_floor", (floorNum) => {
+              console.log(`stopped at ${floorNum}`);
+              if (floorRequests.length > 0) {
+                  floorRequests.forEach((request, index) => {
+                      if (request.floorNum === floorNum) {
+                          floorRequests.splice(index, 1);
+                      }
+                  });
+              }
+          });
+      });
+
+      // Map through floors, pushing requests into the floorRequests array
+      // TODO: Sort the requests array based on direction of travel
+      floors.map((floor) => {
+          floor.on("down_button_pressed", () => {
+              floorRequests.push({ floorNum: floor.floorNum(), direction: "down" });
+          });
+          floor.on("up_button_pressed", () => {
+              floorRequests.push({ floorNum: floor.floorNum(), direction: "up" });
           });
       });
   },
